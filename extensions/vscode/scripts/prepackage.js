@@ -14,7 +14,11 @@ const { copySqlite } = require("./download-copy-sqlite");
 const { generateAndCopyConfigYamlSchema } = require("./generate-copy-config");
 const { installAndCopyNodeModules } = require("./install-copy-nodemodule");
 const { npmInstall } = require("./npm-install");
-const { writeBuildTimestamp, continueDir } = require("./utils");
+const {
+  writeBuildTimestamp,
+  continueDir,
+  downloadRipgrepBinary,
+} = require("./utils");
 
 // Clear folders that will be packaged to ensure clean slate
 rimrafSync(path.join(__dirname, "..", "bin"));
@@ -67,6 +71,22 @@ const exe = os === "win32" ? ".exe" : "";
 const isWinTarget = target?.startsWith("win");
 const isLinuxTarget = target?.startsWith("linux");
 const isMacTarget = target?.startsWith("darwin");
+
+function getHostTarget() {
+  const [hostOs, hostArch] = autodetectPlatformAndArch();
+  let normalizedHostOs = hostOs;
+  let normalizedHostArch = hostArch;
+  if (normalizedHostOs === "alpine") {
+    normalizedHostOs = "linux";
+  }
+  if (normalizedHostArch === "armhf") {
+    normalizedHostArch = "arm64";
+  }
+  return `${normalizedHostOs}-${normalizedHostArch}`;
+}
+
+const hostTarget = getHostTarget();
+const isCrossCompile = target !== hostTarget;
 
 void (async () => {
   const startTime = Date.now();
@@ -337,8 +357,17 @@ void (async () => {
 
   if (!skipInstalls) {
     await copySqlite(target);
+  } else if (isCrossCompile) {
+    console.log(
+      `[info] Cross-compiling for ${target} (host is ${hostTarget}); downloading sqlite binary`,
+    );
+    await copySqlite(target);
   } else {
     console.log("[info] Skipping sqlite download because SKIP_INSTALLS=true");
+  }
+
+  if (isCrossCompile) {
+    await downloadRipgrepBinary(target);
   }
 
   console.log("[info] Copying sqlite node binding from core");

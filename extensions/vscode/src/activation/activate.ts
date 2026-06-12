@@ -10,6 +10,10 @@ import setupInlineTips from "./InlineTipManager";
 
 let hasActivated = false;
 
+export function resetActivationState() {
+  hasActivated = false;
+}
+
 export async function activateExtension(context: vscode.ExtensionContext) {
   // With extensionKind ["ui","workspace"], both hosts activate and register the same
   // commands, which breaks activation (empty sidebar, "already registered" errors).
@@ -49,6 +53,7 @@ export async function activateExtension(context: vscode.ExtensionContext) {
   setupInlineTips(context);
 
   const vscodeExtension = new VsCodeExtension(context);
+  await vscodeExtension.registerExtensionCommands();
 
   // Load Continue configuration
   if (!context.globalState.get("hasBeenInstalled")) {

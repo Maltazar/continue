@@ -58,9 +58,11 @@ Do **not** run the upstream `scripts/install-dependencies.sh` or build the `bina
 
 ## Build
 
+Build in WSL, but target **Windows** binaries (VSCodium runs on Windows, not inside WSL):
+
 ```bash
 ./scripts/fork-setup.sh          # once — installs deps for core, gui, vscode extension
-./scripts/fork-build.sh          # produces VSIX
+./scripts/fork-build.sh          # produces VSIX (defaults to CONTINUE_BUILD_TARGET=win32-x64)
 ```
 
 Incremental rebuild (skip GUI when unchanged):
@@ -68,6 +70,8 @@ Incremental rebuild (skip GUI when unchanged):
 ```bash
 SKIP_INSTALLS=true ./scripts/fork-build.sh --skip-gui
 ```
+
+`fork-build.sh` sets `CONTINUE_BUILD_TARGET=win32-x64` by default. Prepackage downloads Windows-native `node_sqlite3.node`, LanceDB, and onnx binaries even when building from Linux/WSL.
 
 **Output:**
 
@@ -103,7 +107,7 @@ Dry run:
 .\install-vsix.ps1 -DryRun
 ```
 
-The script uninstalls the old `Continue.continue`, removes stale extension folders and `extensions.json` entries, then installs the VSIX via `codium.cmd --install-extension --force`.
+The script closes VSCodium before installing (clears stale extension host state), uninstalls the old `Continue.continue`, removes stale folders and `extensions.json` entries, then installs the VSIX via `codium.cmd --install-extension --force`.
 
 Override VSCodium location if needed:
 
@@ -139,8 +143,33 @@ Fully quit VSCodium, then reopen. Confirm **Continue.continue** appears under Ru
 
 ## Environment variables
 
-| Variable                | Used by            | Purpose                                      |
-| ----------------------- | ------------------ | -------------------------------------------- |
-| `SKIP_INSTALLS=true`    | `fork-build.sh`    | Skip sqlite re-download during prepackage    |
-| `CONTINUE_WINDOWS_USER` | `fork-install.sh`  | Windows username for staging (auto-detected) |
-| `CONTINUE_VSCODIUM_CMD` | `install-vsix.ps1` | Path to `codium.cmd`                         |
+| Variable                | Used by            | Purpose                                                             |
+| ----------------------- | ------------------ | ------------------------------------------------------------------- |
+| `CONTINUE_BUILD_TARGET` | `fork-build.sh`    | Native binary target (default: `win32-x64`)                         |
+| `SKIP_INSTALLS=true`    | `fork-build.sh`    | Skip npm reinstalls in prepackage (Windows sqlite still downloaded) |
+| `CONTINUE_WINDOWS_USER` | `fork-install.sh`  | Windows username for staging (auto-detected)                        |
+| `CONTINUE_VSCODIUM_CMD` | `install-vsix.ps1` | Path to `codium.cmd`                                                |
+
+## Troubleshooting
+
+### `node_sqlite3.node is not a valid Win32 application`
+
+The VSIX was built for the wrong platform (usually `linux-x64` because WSL auto-detected the host). Rebuild with:
+
+```bash
+CONTINUE_BUILD_TARGET=win32-x64 ./scripts/fork-build.sh --skip-gui
+```
+
+Then reinstall with `install-vsix.ps1` (removes all `continue.continue-*` versions).
+
+### `Command 'continue.focusContinueInput' already registered`
+
+Harmless if Continue works. Usually caused by a reload leaving stale command handlers, or calling `registerCommand` when the command already exists. Reinstall with `install-vsix.ps1` (closes VSCodium, removes all `continue.continue-*` folders). If an old version still appears in DevTools Sources, fully quit VSCodium and reopen.
+
+### `Failed to load resource: sidebar-icon.png`
+
+Often a stale reference to an old extension version in DevTools. Confirm only one `continue.continue-*` folder exists under `%USERPROFILE%\.vscode-oss\extensions\`. Reinstall if needed.
+
+### YAML grammar overwrite warnings
+
+From the Red Hat YAML extension overriding the built-in VSCodium YAML grammar. Unrelated to Continue; safe to ignore.

@@ -21,6 +21,8 @@ import * as YAML from "yaml";
 
 import { convertJsonToYamlConfig } from "../../../packages/config-yaml/dist";
 
+import { safeRegisterCommand } from "./util/safeRegisterCommand";
+
 import {
   getAutocompleteStatusBarDescription,
   getAutocompleteStatusBarTitle,
@@ -870,7 +872,7 @@ async function installModelWithProgress(
   );
 }
 
-export function registerAllCommands(
+export async function registerAllCommands(
   context: vscode.ExtensionContext,
   ide: VsCodeIde,
   extensionContext: vscode.ExtensionContext,
@@ -883,6 +885,8 @@ export function registerAllCommands(
   core: Core,
   editDecorationManager: EditDecorationManager,
 ) {
+  const existingCommands = new Set(await vscode.commands.getCommands(true));
+
   for (const [command, callback] of Object.entries(
     getCommandsMap(
       ide,
@@ -897,19 +901,6 @@ export function registerAllCommands(
       editDecorationManager,
     ),
   )) {
-    try {
-      context.subscriptions.push(
-        vscode.commands.registerCommand(command, callback),
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes("already registered")) {
-        console.warn(
-          `[Continue] Command already registered, skipping: ${command}`,
-        );
-        continue;
-      }
-      throw error;
-    }
+    await safeRegisterCommand(context, command, callback, existingCommands);
   }
 }

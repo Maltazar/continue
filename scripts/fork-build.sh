@@ -2,12 +2,13 @@
 # Build a VSIX for this Continue fork.
 #
 # Usage:
-#   ./scripts/fork-build.sh              # incremental build
+#   ./scripts/fork-build.sh              # incremental build (defaults to win32-x64 for VSCodium on Windows)
 #   ./scripts/fork-build.sh --setup      # run fork-setup.sh first if needed
 #   ./scripts/fork-build.sh --skip-gui   # skip gui rebuild (faster, core/vscode only)
 #
 # Environment:
-#   SKIP_INSTALLS=true                   # faster prepackage when deps already installed
+#   CONTINUE_BUILD_TARGET=win32-x64      # default; override for other platforms
+#   SKIP_INSTALLS=true                   # skip npm reinstalls in prepackage (sqlite still downloaded when cross-compiling)
 
 set -euo pipefail
 
@@ -27,7 +28,7 @@ while [ $# -gt 0 ]; do
       SKIP_GUI=true
       ;;
     -h|--help)
-      sed -n '2,12p' "$0"
+      sed -n '2,13p' "$0"
       exit 0
       ;;
     *)
@@ -66,7 +67,10 @@ else
   [ -d gui/dist ] || fork_die "gui/dist is missing. Run without --skip-gui first."
 fi
 
-fork_log "Packaging VS Code extension..."
+BUILD_TARGET="${CONTINUE_BUILD_TARGET:-win32-x64}"
+export CONTINUE_BUILD_TARGET="$BUILD_TARGET"
+
+fork_log "Packaging VS Code extension for $BUILD_TARGET..."
 pushd extensions/vscode >/dev/null
 npm run package
 popd >/dev/null
@@ -81,7 +85,7 @@ VSIX_PATH="$(fork_latest_vsix "$REPO_ROOT/extensions/vscode/build")"
 fork_copy_install_bundle "$REPO_ROOT/extensions/vscode/build" "$VSIX_PATH"
 BUNDLE_DIR="$REPO_ROOT/extensions/vscode/build/continue-install-bundle"
 
-fork_log "Build complete: $VSIX_PATH"
+fork_log "Build complete: $VSIX_PATH (target: $BUILD_TARGET)"
 fork_log ""
 fork_log "Install options:"
 fork_log "  1. Windows:    copy $BUNDLE_DIR to Windows, then: .\\install-vsix.ps1"

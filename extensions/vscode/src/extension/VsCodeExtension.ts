@@ -78,6 +78,7 @@ export class VsCodeExtension {
   private fileSearch: FileSearch;
   private uriHandler = new UriEventHandler();
   private completionProvider: ContinueCompletionProvider;
+  private quickEdit: QuickEdit;
 
   private ARBITRARY_TYPING_DELAY = 2000;
 
@@ -375,7 +376,7 @@ export class VsCodeExtension {
       this.ide,
     );
 
-    const quickEdit = new QuickEdit(
+    this.quickEdit = new QuickEdit(
       this.verticalDiffManager,
       this.configHandler,
       this.sidebar.webviewProtocol,
@@ -396,21 +397,6 @@ export class VsCodeExtension {
         "continue.continueConsoleView",
         this.consoleView,
       ),
-    );
-
-    // Commands
-    registerAllCommands(
-      context,
-      this.ide,
-      context,
-      this.sidebar,
-      this.consoleView,
-      this.configHandler,
-      this.verticalDiffManager,
-      this.battery,
-      quickEdit,
-      this.core,
-      this.editDecorationManager,
     );
 
     // Disabled due to performance issues
@@ -645,5 +631,21 @@ export class VsCodeExtension {
 
   public deactivateNextEdit() {
     this.completionProvider.deactivateNextEdit();
+  }
+
+  async registerExtensionCommands(): Promise<void> {
+    await registerAllCommands(
+      this.extensionContext,
+      this.ide,
+      this.extensionContext,
+      this.sidebar,
+      this.consoleView,
+      this.configHandler,
+      this.verticalDiffManager,
+      this.battery,
+      this.quickEdit,
+      this.core,
+      this.editDecorationManager,
+    );
   }
 }

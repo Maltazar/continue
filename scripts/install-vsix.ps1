@@ -33,6 +33,21 @@ function Write-ForkDie([string]$Message) {
     Write-Error "[fork] $Message"
 }
 
+function Invoke-Vscodium {
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Args
+    )
+
+    Push-Location $env:TEMP
+    try {
+        & $VscodiumCmd @Args
+        return $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
+}
+
 if (-not $VscodiumCmd) {
     $VscodiumCmd = Join-Path ${env:ProgramFiles} "VSCodium\bin\codium.cmd"
 }
@@ -78,12 +93,21 @@ if ($DryRun) {
     exit 0
 }
 
+$vscodiumProcesses = Get-Process -Name "VSCodium" -ErrorAction SilentlyContinue
+if ($vscodiumProcesses) {
+    Write-ForkLog "Closing VSCodium to clear extension host state..."
+    $vscodiumProcesses | Stop-Process -Force
+    Start-Sleep -Seconds 2
+}
+
 Write-ForkLog "Cleaning up leftover Continue installs..."
 
-& $VscodiumCmd --uninstall-extension Continue.continue 2>$null | Out-Null
+Invoke-Vscodium --uninstall-extension Continue.continue | Out-Null
 
 if (Test-Path $ExtDir) {
     Get-ChildItem -Path $ExtDir -Directory -Filter "continue.continue-*" -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $ExtDir -Directory -Filter "Continue.continue-*" -ErrorAction SilentlyContinue |
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
 
@@ -99,7 +123,10 @@ if (Test-Path $ExtensionsJson) {
 }
 
 Write-ForkLog "Installing via VSCodium CLI..."
-& $VscodiumCmd --install-extension $VsixPath --force
+$installExit = Invoke-Vscodium --install-extension $VsixPath --force
+if ($installExit -ne 0) {
+    Write-ForkWarn "codium --install-extension exited with code $installExit"
+}
 
 if ((Test-Path $ExtensionsJson) -and (Select-String -LiteralPath $ExtensionsJson -Pattern '"id":"continue.continue"' -Quiet)) {
     Write-ForkLog "Continue $Version registered in VSCodium."
