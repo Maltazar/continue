@@ -2,16 +2,18 @@ import { getContinueRcPath, getTsConfigPath } from "core/util/paths";
 import * as vscode from "vscode";
 
 import { VsCodeExtension } from "../extension/VsCodeExtension";
+import { resetCommandRegistrationState } from "../commands";
 import { isUnsupportedPlatform } from "../util/util";
 
 import { GlobalContext } from "core/util/GlobalContext";
 import { VsCodeContinueApi } from "./api";
 import setupInlineTips from "./InlineTipManager";
 
-let hasActivated = false;
+let activateWork: Promise<Record<string, unknown>> | undefined;
 
 export function resetActivationState() {
-  hasActivated = false;
+  activateWork = undefined;
+  resetCommandRegistrationState();
 }
 
 export async function activateExtension(context: vscode.ExtensionContext) {
@@ -22,14 +24,15 @@ export async function activateExtension(context: vscode.ExtensionContext) {
     return {};
   }
 
-  if (hasActivated) {
-    console.warn(
-      "[Continue] activateExtension called more than once; skipping duplicate activation",
-    );
-    return {};
+  if (!activateWork) {
+    activateWork = activateOnce(context);
   }
-  hasActivated = true;
+  return activateWork;
+}
 
+async function activateOnce(
+  context: vscode.ExtensionContext,
+): Promise<Record<string, unknown>> {
   const platformCheck = isUnsupportedPlatform();
   const globalContext = new GlobalContext();
   const hasShownUnsupportedPlatformWarning = globalContext.get(

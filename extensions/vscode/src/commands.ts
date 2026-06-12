@@ -872,7 +872,11 @@ async function installModelWithProgress(
   );
 }
 
-export async function registerAllCommands(
+export function resetCommandRegistrationState() {
+  registerCommandsWork = undefined;
+}
+
+async function registerAllCommandsOnce(
   context: vscode.ExtensionContext,
   ide: VsCodeIde,
   extensionContext: vscode.ExtensionContext,
@@ -903,4 +907,37 @@ export async function registerAllCommands(
   )) {
     await safeRegisterCommand(context, command, callback, existingCommands);
   }
+}
+
+let registerCommandsWork: Promise<void> | undefined;
+
+export async function registerAllCommands(
+  context: vscode.ExtensionContext,
+  ide: VsCodeIde,
+  extensionContext: vscode.ExtensionContext,
+  sidebar: ContinueGUIWebviewViewProvider,
+  consoleView: ContinueConsoleWebviewViewProvider,
+  configHandler: ConfigHandler,
+  verticalDiffManager: VerticalDiffManager,
+  battery: Battery,
+  quickEdit: QuickEdit,
+  core: Core,
+  editDecorationManager: EditDecorationManager,
+) {
+  if (!registerCommandsWork) {
+    registerCommandsWork = registerAllCommandsOnce(
+      context,
+      ide,
+      extensionContext,
+      sidebar,
+      consoleView,
+      configHandler,
+      verticalDiffManager,
+      battery,
+      quickEdit,
+      core,
+      editDecorationManager,
+    );
+  }
+  return registerCommandsWork;
 }
