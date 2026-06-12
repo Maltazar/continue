@@ -126,7 +126,11 @@ export class ReverseMessageIde {
     });
 
     this.on("runCommand", (data) => {
-      return this.ide.runCommand(data.command);
+      return this.ide.runCommand(data.command, data.options);
+    });
+
+    this.on("runCommandWithOutput", (data) => {
+      return this.ide.runCommandWithOutput(data.command, data.cwd);
     });
 
     this.on("saveFile", (data) => {

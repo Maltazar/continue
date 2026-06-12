@@ -14,6 +14,7 @@ class MessageTypes {
             "showVirtualFile",
             "openFile",
             "runCommand",
+            "runCommandWithOutput",
             "saveFile",
             "readFile",
             "showDiff",

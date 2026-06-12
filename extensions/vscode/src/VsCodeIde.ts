@@ -349,10 +349,151 @@ class VsCodeIde implements IDE {
     }
 
     if (!terminal) {
-      terminal = vscode.window.createTerminal(options?.terminalName);
+      terminal = await this.createRemoteAwareTerminal({
+        name: options?.terminalName,
+      });
     }
     terminal.show();
-    terminal.sendText(command, false);
+    terminal.sendText(command, true);
+  }
+
+  async runCommandWithOutput(command: string, cwd?: string): Promise<string> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const terminalCwd = cwd ? vscode.Uri.parse(cwd) : workspaceFolder?.uri;
+
+    const terminal = await this.createRemoteAwareTerminal({
+      name: "Continue",
+      cwd: terminalCwd,
+      hideFromUser: true,
+    });
+
+    const shellIntegration = await this.waitForShellIntegration(
+      terminal,
+      10000,
+    );
+
+    if (!shellIntegration) {
+      terminal.show();
+      terminal.sendText(command, true);
+      return "";
+    }
+
+    try {
+      const execution = shellIntegration.executeCommand(command);
+      let output = "";
+
+      for await (const chunk of execution.read()) {
+        output += chunk;
+      }
+
+      const exitCode = await execution.exitCode;
+      if (exitCode !== undefined && exitCode !== 0) {
+        output += `\n[Exit code: ${exitCode}]`;
+      }
+
+      // Strip VS Code shell integration OSC sequences (]633;...) but preserve
+      // ANSI color/formatting codes (e.g. \033[31m) which are part of command output
+      output = output.replace(/\x1b\]633;[^\x07]*\x07/g, "");
+      output = output.replace(/\]633;[^\n]*/g, "");
+      output = output.trim();
+
+      terminal.dispose();
+      return output;
+    } catch (error) {
+      console.error(
+        "[Continue] shellIntegration.executeCommand failed:",
+        error,
+      );
+      terminal.dispose();
+      return "";
+    }
+  }
+
+  private isRemoteSession(): boolean {
+    return !!vscode.env.remoteName;
+  }
+
+  /**
+   * Creates a terminal in the correct environment (local vs SSH/WSL/Dev Container).
+   * UI-side extension hosts must use workbench.action.terminal.new for remotes —
+   * createTerminal() alone opens a local terminal on the Windows host.
+   */
+  private async createRemoteAwareTerminal(options?: {
+    name?: string;
+    cwd?: vscode.Uri;
+    hideFromUser?: boolean;
+  }): Promise<vscode.Terminal> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const cwd = options?.cwd ?? workspaceFolder?.uri;
+
+    if (!this.isRemoteSession()) {
+      return vscode.window.createTerminal({
+        name: options?.name,
+        cwd,
+        hideFromUser: options?.hideFromUser,
+      });
+    }
+
+    return new Promise<vscode.Terminal>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        disposable.dispose();
+        try {
+          resolve(
+            vscode.window.createTerminal({
+              name: options?.name ?? "Continue",
+              cwd,
+              hideFromUser: options?.hideFromUser,
+            }),
+          );
+        } catch {
+          reject(new Error("Timed out waiting for remote terminal"));
+        }
+      }, 10000);
+
+      const disposable = vscode.window.onDidOpenTerminal((terminal) => {
+        clearTimeout(timeout);
+        disposable.dispose();
+        resolve(terminal);
+      });
+
+      void vscode.commands.executeCommand("workbench.action.terminal.new");
+    });
+  }
+
+  private async waitForShellIntegration(
+    terminal: vscode.Terminal,
+    timeoutMs: number,
+  ): Promise<any> {
+    if ((terminal as any).shellIntegration) {
+      return (terminal as any).shellIntegration;
+    }
+
+    if (!(vscode.window as any).onDidChangeTerminalShellIntegration) {
+      return undefined;
+    }
+
+    return new Promise<any>((resolve) => {
+      const timeout = setTimeout(() => {
+        disposable.dispose();
+        resolve(undefined);
+      }, timeoutMs);
+
+      const disposable = (
+        vscode.window as any
+      ).onDidChangeTerminalShellIntegration((e: any) => {
+        if (e.terminal === terminal) {
+          clearTimeout(timeout);
+          disposable.dispose();
+          resolve(e.shellIntegration);
+        }
+      });
+
+      if ((terminal as any).shellIntegration) {
+        clearTimeout(timeout);
+        disposable.dispose();
+        resolve((terminal as any).shellIntegration);
+      }
+    });
   }
 
   async saveFile(fileUri: string): Promise<void> {
@@ -694,6 +835,9 @@ class VsCodeIde implements IDE {
         "pauseCodebaseIndexOnStart",
         false,
       ),
+      externalRulesPaths: settings.get<string[]>("externalRulesPaths", []),
+      externalSkillsPaths: settings.get<string[]>("externalSkillsPaths", []),
+      externalAgentPaths: settings.get<string[]>("externalAgentPaths", []),
     };
     return ideSettings;
   }

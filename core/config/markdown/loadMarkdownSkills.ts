@@ -5,10 +5,9 @@ import {
 import z from "zod";
 import { IDE, Skill } from "../..";
 import { walkDir } from "../../indexing/walkDir";
-import { localPathToUri } from "../../util/pathToUri";
-import { getGlobalFolderWithName } from "../../util/paths";
-import { findUriInDirs, joinPathsToUri } from "../../util/uri";
+import { findUriInDirs } from "../../util/uri";
 import { getAllDotContinueDefinitionFiles } from "../loadLocalAssistants";
+import { getExternalConfigDirs } from "./externalConfigPaths";
 
 const skillFrontmatterSchema = z.object({
   name: z.string().min(1),
@@ -18,14 +17,10 @@ const skillFrontmatterSchema = z.object({
 const SKILLS_DIR = "skills";
 
 /**
- * Get skills from .claude/skills directory
+ * Get skills from .claude/skills, .cursor/skills, .vscode/skills, and configured paths
  */
-async function getClaudeSkillsDir(ide: IDE) {
-  const fullDirs = (await ide.getWorkspaceDirs()).map((dir) =>
-    joinPathsToUri(dir, ".claude", SKILLS_DIR),
-  );
-
-  fullDirs.push(localPathToUri(getGlobalFolderWithName(SKILLS_DIR)));
+async function getExternalSkillsDirs(ide: IDE) {
+  const fullDirs = await getExternalConfigDirs(ide, "skills");
 
   return (
     await Promise.all(
@@ -33,9 +28,8 @@ async function getClaudeSkillsDir(ide: IDE) {
         const exists = await ide.fileExists(dir);
         if (!exists) return [];
         const uris = await walkDir(dir, ide, {
-          source: "get .claude skills files",
+          source: "get external skills files",
         });
-        // filter markdown files only
         return uris.filter((uri) => uri.endsWith(".md"));
       }),
     )
@@ -59,7 +53,7 @@ export async function loadMarkdownSkills(ide: IDE) {
           SKILLS_DIR,
         )
       ).map((file) => file.path),
-      ...(await getClaudeSkillsDir(ide)),
+      ...(await getExternalSkillsDirs(ide)),
     ];
 
     const skillFiles = yamlAndMarkdownFileUris.filter((path) =>

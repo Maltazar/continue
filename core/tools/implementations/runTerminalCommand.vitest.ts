@@ -27,6 +27,7 @@ describe("runTerminalCommandImpl", () => {
   const mockGetWorkspaceDirs = vi.fn();
   const mockOnPartialOutput = vi.fn();
   const mockRunCommand = vi.fn();
+  const mockRunCommandWithOutput = vi.fn();
 
   // Use a simple approach to ensure background processes are terminated
   let testPid: number | null = null;
@@ -48,6 +49,7 @@ describe("runTerminalCommandImpl", () => {
     mockGetWorkspaceDirs.mockReturnValue(
       Promise.resolve([`file://${tempDir}`]),
     );
+    mockRunCommandWithOutput.mockResolvedValue("remote output");
   });
 
   afterEach(async () => {
@@ -95,6 +97,7 @@ describe("runTerminalCommandImpl", () => {
       getIdeInfo: mockGetIdeInfo,
       getWorkspaceDirs: mockGetWorkspaceDirs,
       runCommand: mockRunCommand,
+      runCommandWithOutput: mockRunCommandWithOutput,
       // Add stubs for other required IDE methods
       getIdeSettings: vi.fn(),
       getDiff: vi.fn(),
@@ -263,16 +266,17 @@ describe("runTerminalCommandImpl", () => {
   });
 
   it("should handle remote environments", async () => {
-    // We'll keep mocking for remote environments as we can't test those directly
     const args = { command: "echo 'test'", waitForCompletion: true };
     const extras = createMockExtras({ remoteName: "ssh" });
 
     const result = await runTerminalCommandImpl(args, extras);
 
-    // In remote environments, it should use the IDE's runCommand
-    expect(mockRunCommand).toHaveBeenCalledWith("echo 'test'");
-    expect(result[0].content).toContain("Command executed in remote terminal");
-    expect(result[0].status).toBe("Command executed");
+    expect(mockRunCommandWithOutput).toHaveBeenCalledWith(
+      "echo 'test'",
+      `file://${tempDir}`,
+    );
+    expect(result[0].content).toBe("remote output");
+    expect(result[0].status).toBe("Command completed");
   });
 
   it("should handle errors when executing invalid commands", async () => {
@@ -605,7 +609,7 @@ describe("runTerminalCommandImpl", () => {
     });
 
     describe("remote environment handling", () => {
-      it("should use ide.runCommand for remote environments", async () => {
+      it("should use ide.runCommandWithOutput for remote environments", async () => {
         const extras = createMockExtras({
           remoteName: "some-unsupported-remote",
         });
@@ -615,10 +619,12 @@ describe("runTerminalCommandImpl", () => {
           extras,
         );
 
-        expect(mockRunCommand).toHaveBeenCalledWith("echo test");
-        expect(result[0].content).toContain(
-          "Command executed in remote terminal",
+        expect(mockRunCommandWithOutput).toHaveBeenCalledWith(
+          "echo test",
+          `file://${tempDir}`,
         );
+        expect(result[0].content).toBe("remote output");
+        expect(result[0].status).toBe("Command completed");
       });
 
       it("should handle local environment with file URIs", async () => {
@@ -632,7 +638,7 @@ describe("runTerminalCommandImpl", () => {
         ).resolves.toBeDefined();
       });
 
-      it("should use ide.runCommand for WSL environment", async () => {
+      it("should use ide.runCommandWithOutput for WSL environment", async () => {
         // WSL is a remote — commands should execute in WSL, not on the host
         const extras = createMockExtras({ remoteName: "wsl" });
 
@@ -641,13 +647,14 @@ describe("runTerminalCommandImpl", () => {
           extras,
         );
 
-        expect(mockRunCommand).toHaveBeenCalledWith("echo test");
-        expect(result[0].content).toContain(
-          "Command executed in remote terminal",
+        expect(mockRunCommandWithOutput).toHaveBeenCalledWith(
+          "echo test",
+          `file://${tempDir}`,
         );
+        expect(result[0].status).toBe("Command completed");
       });
 
-      it("should use ide.runCommand for dev-container environment", async () => {
+      it("should use ide.runCommandWithOutput for dev-container environment", async () => {
         const extras = createMockExtras({ remoteName: "dev-container" });
 
         const result = await runTerminalCommandImpl(
@@ -655,10 +662,11 @@ describe("runTerminalCommandImpl", () => {
           extras,
         );
 
-        expect(mockRunCommand).toHaveBeenCalledWith("echo test");
-        expect(result[0].content).toContain(
-          "Command executed in remote terminal",
+        expect(mockRunCommandWithOutput).toHaveBeenCalledWith(
+          "echo test",
+          `file://${tempDir}`,
         );
+        expect(result[0].status).toBe("Command completed");
       });
     });
 

@@ -2,14 +2,13 @@
   "name": "continue",
   "icon": "media/icon.png",
   "author": "Continue Dev, Inc",
-  "version": "1.3.39",
+  "version": "1.3.40",
   "repository": {
     "type": "git",
     "url": "https://github.com/continuedev/continue"
   },
   "extensionKind": [
-    "ui",
-    "workspace"
+    "ui"
   ],
   "bugs": {
     "url": "https://github.com/continuedev/continue/issues",
@@ -147,6 +146,30 @@
           "type": "number",
           "default": 60,
           "description": "The period of time in minutes between automatic syncs."
+        },
+        "continue.externalRulesPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Additional directories to load rules from (.md/.mdc). Workspace `.cursor/rules` and `.vscode/rules` are scanned automatically, as are `~/.cursor/rules` and `~/.vscode/rules`."
+        },
+        "continue.externalSkillsPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Additional directories to load skills from (SKILL.md). Workspace `.cursor/skills` and `.vscode/skills` are scanned automatically, as are `~/.cursor/skills`, `~/.cursor/skills-cursor`, and `~/.vscode/skills`."
+        },
+        "continue.externalAgentPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Additional directories to search for agent files (AGENTS.md, AGENT.md, CLAUDE.md). Workspace `.cursor` and `.vscode` are scanned automatically when no root-level agent file exists."
         }
       }
     },

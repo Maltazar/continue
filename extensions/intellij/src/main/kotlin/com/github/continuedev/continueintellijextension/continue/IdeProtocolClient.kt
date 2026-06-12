@@ -303,6 +303,15 @@ class IdeProtocolClient(
                         respond(null)
                     }
 
+                    "runCommandWithOutput" -> {
+                        val params = gsonService.gson.fromJson(
+                            dataElement.toString(),
+                            RunCommandWithOutputParams::class.java
+                        )
+                        val output = ide.runCommandWithOutput(params.command, params.cwd)
+                        respond(output)
+                    }
+
                     "showToast" -> {
                         val jsonArray = dataElement.asJsonArray
 

@@ -8,7 +8,24 @@ import { GlobalContext } from "core/util/GlobalContext";
 import { VsCodeContinueApi } from "./api";
 import setupInlineTips from "./InlineTipManager";
 
+let hasActivated = false;
+
 export async function activateExtension(context: vscode.ExtensionContext) {
+  // With extensionKind ["ui","workspace"], both hosts activate and register the same
+  // commands, which breaks activation (empty sidebar, "already registered" errors).
+  // This fork runs as UI-only — required for Windows host + SSH remote anyway.
+  if (context.extension.extensionKind === vscode.ExtensionKind.Workspace) {
+    return {};
+  }
+
+  if (hasActivated) {
+    console.warn(
+      "[Continue] activateExtension called more than once; skipping duplicate activation",
+    );
+    return {};
+  }
+  hasActivated = true;
+
   const platformCheck = isUnsupportedPlatform();
   const globalContext = new GlobalContext();
   const hasShownUnsupportedPlatformWarning = globalContext.get(

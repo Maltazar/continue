@@ -340,6 +340,11 @@ class IntelliJIDE(
         }
     }
 
+    override suspend fun runCommandWithOutput(command: String, cwd: String?): String {
+        runCommand(command, null)
+        return ""
+    }
+
     override suspend fun saveFile(filepath: String) =
         withContext(Dispatchers.EDT) {
             fileUtils.saveFile(filepath)

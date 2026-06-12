@@ -189,6 +189,8 @@ interface IDE {
 
     suspend fun runCommand(command: String, options: TerminalOptions?)
 
+    suspend fun runCommandWithOutput(command: String, cwd: String? = null): String
+
     suspend fun saveFile(filepath: String)
 
     suspend fun readFile(filepath: String): String

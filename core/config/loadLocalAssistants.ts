@@ -23,6 +23,10 @@ export function isContinueConfigRelatedUri(uri: string): boolean {
       (uri.endsWith(".yaml") ||
         uri.endsWith(".yml") ||
         uri.endsWith(".json"))) ||
+    uri.includes("/.cursor/rules/") ||
+    uri.includes("/.cursor/skills/") ||
+    uri.includes("/.vscode/rules/") ||
+    uri.includes("/.vscode/skills/") ||
     [...BLOCK_TYPES, "agents", "assistants", "configs"].some((blockType) =>
       uri.includes(`.continue/${blockType}`),
     )

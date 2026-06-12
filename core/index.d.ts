@@ -816,6 +816,12 @@ export interface IdeSettings {
   userToken: string;
   continueTestEnvironment: "none" | "production" | "staging" | "local";
   pauseCodebaseIndexOnStart: boolean;
+  /** Additional directories to scan for rules (.md/.mdc) */
+  externalRulesPaths?: string[];
+  /** Additional directories to scan for skills (SKILL.md) */
+  externalSkillsPaths?: string[];
+  /** Additional directories to scan for agent files (AGENTS.md, etc.) */
+  externalAgentPaths?: string[];
 }
 
 export interface FileStats {
@@ -871,6 +877,8 @@ export interface IDE {
   getExternalUri?(uri: string): Promise<string>;
 
   runCommand(command: string, options?: TerminalOptions): Promise<void>;
+
+  runCommandWithOutput(command: string, cwd?: string): Promise<string>;
 
   saveFile(fileUri: string): Promise<void>;
 
