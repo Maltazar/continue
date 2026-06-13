@@ -41,8 +41,11 @@ function Invoke-Vscodium {
 
     Push-Location $env:TEMP
     try {
-        & $VscodiumCmd @Args
-        return $LASTEXITCODE
+        & $VscodiumCmd @Args | Out-Null
+        if ($null -ne $LASTEXITCODE) {
+            return $LASTEXITCODE
+        }
+        return 0
     } finally {
         Pop-Location
     }

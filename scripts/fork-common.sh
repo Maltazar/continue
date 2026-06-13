@@ -42,6 +42,30 @@ fork_latest_vsix() {
   ls -1t "$build_dir"/continue-*.vsix 2>/dev/null | head -1
 }
 
+# Bump extensions/vscode/package.json patch version (e.g. 1.3.44 -> 1.3.45).
+fork_bump_extension_version() {
+  local repo_root="$1"
+  local pkg_json="$repo_root/extensions/vscode/package.json"
+
+  node - "$pkg_json" <<'NODE'
+const fs = require("fs");
+const pkgPath = process.argv[2];
+const raw = fs.readFileSync(pkgPath, "utf8");
+const pkg = JSON.parse(raw);
+const match = String(pkg.version).match(/^(\d+)\.(\d+)\.(\d+)$/);
+if (!match) {
+  console.error(`Cannot bump non-semver version: ${pkg.version}`);
+  process.exit(1);
+}
+const next = `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
+fs.writeFileSync(
+  pkgPath,
+  raw.replace(/"version":\s*"[^"]+"/, `"version": "${next}"`),
+);
+console.log(next);
+NODE
+}
+
 fork_detect_windows_user() {
   if [ -n "${CONTINUE_WINDOWS_USER:-}" ]; then
     echo "$CONTINUE_WINDOWS_USER"

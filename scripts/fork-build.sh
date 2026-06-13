@@ -9,6 +9,8 @@
 # Environment:
 #   CONTINUE_BUILD_TARGET=win32-x64      # default; override for other platforms
 #   SKIP_INSTALLS=true                   # skip npm reinstalls in prepackage (sqlite still downloaded when cross-compiling)
+#
+# Each build bumps extensions/vscode/package.json patch version unless --no-bump is passed.
 
 set -euo pipefail
 
@@ -18,6 +20,7 @@ source "$SCRIPT_DIR/fork-common.sh"
 
 RUN_SETUP=false
 SKIP_GUI=false
+NO_BUMP=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -27,8 +30,11 @@ while [ $# -gt 0 ]; do
     --skip-gui)
       SKIP_GUI=true
       ;;
+    --no-bump)
+      NO_BUMP=true
+      ;;
     -h|--help)
-      sed -n '2,13p' "$0"
+      sed -n '2,14p' "$0"
       exit 0
       ;;
     *)
@@ -69,6 +75,13 @@ fi
 
 BUILD_TARGET="${CONTINUE_BUILD_TARGET:-win32-x64}"
 export CONTINUE_BUILD_TARGET="$BUILD_TARGET"
+
+if [ "$NO_BUMP" = false ]; then
+  NEW_VERSION="$(fork_bump_extension_version "$REPO_ROOT")"
+  fork_log "Bumped extension version to $NEW_VERSION"
+else
+  fork_warn "Skipping version bump (--no-bump)"
+fi
 
 fork_log "Packaging VS Code extension for $BUILD_TARGET..."
 pushd extensions/vscode >/dev/null
