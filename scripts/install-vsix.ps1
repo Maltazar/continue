@@ -1,18 +1,26 @@
 # Install a Continue VSIX into VSCodium (Windows).
 #
-# Copy this script next to a VSIX and run from PowerShell:
+# Local VSIX (copy script next to the VSIX, or pass -VsixPath):
 #   .\install-vsix.ps1
-#   .\install-vsix.ps1 -VsixPath C:\Users\You\Downloads\continue-1.3.40.vsix
+#   .\install-vsix.ps1 -VsixPath C:\Users\You\Downloads\continue-1.3.45.vsix
+#
+# From a GitHub Release (downloads continue-*.vsix from the release assets):
+#   .\install-vsix.ps1 -GitHubRepo Maltazar/continue
+#   .\install-vsix.ps1 -GitHubRepo Maltazar/continue -Version 1.3.45
+#
 #   .\install-vsix.ps1 -DryRun
 #
-# With no -VsixPath, installs the newest continue-*.vsix in this script's directory.
-#
-# Environment override:
+# Environment:
 #   $env:CONTINUE_VSCODIUM_CMD = "C:\Program Files\VSCodium\bin\codium.cmd"
+#   $env:GITHUB_TOKEN            # optional; for private repos
 
 param(
     [Parameter(Position = 0)]
     [string]$VsixPath,
+
+    [string]$GitHubRepo,
+
+    [string]$Version = "latest",
 
     [switch]$DryRun,
 
@@ -31,6 +39,55 @@ function Write-ForkWarn([string]$Message) {
 
 function Write-ForkDie([string]$Message) {
     Write-Error "[fork] $Message"
+}
+
+function Get-GitHubRequestHeaders {
+    $headers = @{
+        "User-Agent" = "continue-fork-installer"
+        Accept       = "application/vnd.github+json"
+    }
+
+    if ($env:GITHUB_TOKEN) {
+        $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN"
+    }
+
+    return $headers
+}
+
+function Get-VsixFromGitHubRelease {
+    param(
+        [string]$Repo,
+        [string]$Version
+    )
+
+    $headers = Get-GitHubRequestHeaders
+
+    if ($Version -eq "latest") {
+        $releaseUri = "https://api.github.com/repos/$Repo/releases/latest"
+    } else {
+        $tag = "continue-v$Version"
+        $releaseUri = "https://api.github.com/repos/$Repo/releases/tags/$tag"
+    }
+
+    Write-ForkLog "Fetching release metadata from GitHub ($Repo, version: $Version)..."
+
+    try {
+        $release = Invoke-RestMethod -Uri $releaseUri -Headers $headers
+    } catch {
+        Write-ForkDie "Could not fetch GitHub release for $Repo (version: $Version). $_"
+    }
+
+    $asset = @($release.assets | Where-Object { $_.name -like "continue-*.vsix" } | Sort-Object name -Descending)[0]
+    if (-not $asset) {
+        Write-ForkDie "Release '$($release.tag_name)' has no continue-*.vsix asset."
+    }
+
+    $dest = Join-Path $env:TEMP $asset.name
+    Write-ForkLog "Downloading $($asset.name) ($([math]::Round($asset.size / 1MB, 1)) MB)..."
+
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $dest -Headers $headers -UseBasicParsing
+
+    return $dest
 }
 
 function Invoke-Vscodium {
@@ -61,6 +118,14 @@ if (-not (Test-Path $VscodiumCmd)) {
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+if ($GitHubRepo -and $VsixPath) {
+    Write-ForkDie "Use either -GitHubRepo or -VsixPath, not both."
+}
+
+if ($GitHubRepo) {
+    $VsixPath = Get-VsixFromGitHubRelease -Repo $GitHubRepo -Version $Version
+}
+
 if (-not $VsixPath) {
     $latest = Get-ChildItem -Path $ScriptDir -Filter "continue-*.vsix" -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending |
@@ -72,22 +137,22 @@ if (-not $VsixPath) {
 }
 
 if (-not $VsixPath -or -not (Test-Path -LiteralPath $VsixPath)) {
-    Write-ForkDie "VSIX not found. Pass -VsixPath or place continue-*.vsix next to this script."
+    Write-ForkDie "VSIX not found. Pass -VsixPath, -GitHubRepo, or place continue-*.vsix next to this script."
 }
 
 $VsixPath = (Resolve-Path -LiteralPath $VsixPath).Path
 
 if ($VsixPath -match "continue-(\d+\.\d+\.\d+)\.vsix$") {
-    $Version = $Matches[1]
+    $InstalledVersion = $Matches[1]
 } else {
-    $Version = "unknown"
+    $InstalledVersion = "unknown"
 }
 
 $ExtDir = Join-Path $env:USERPROFILE ".vscode-oss\extensions"
 $ExtensionsJson = Join-Path $ExtDir "extensions.json"
 
 Write-ForkLog "VSIX:           $VsixPath"
-Write-ForkLog "Version:        $Version"
+Write-ForkLog "Version:        $InstalledVersion"
 Write-ForkLog "Extensions dir: $ExtDir"
 Write-ForkLog "VSCodium CLI:   $VscodiumCmd"
 
@@ -132,7 +197,7 @@ if ($installExit -ne 0) {
 }
 
 if ((Test-Path $ExtensionsJson) -and (Select-String -LiteralPath $ExtensionsJson -Pattern '"id":"continue.continue"' -Quiet)) {
-    Write-ForkLog "Continue $Version registered in VSCodium."
+    Write-ForkLog "Continue $InstalledVersion registered in VSCodium."
     Write-ForkLog "Fully quit VSCodium (all windows), then reopen."
     exit 0
 }

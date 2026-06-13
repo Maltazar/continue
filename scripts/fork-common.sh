@@ -42,6 +42,142 @@ fork_latest_vsix() {
   ls -1t "$build_dir"/continue-*.vsix 2>/dev/null | head -1
 }
 
+fork_read_extension_version() {
+  local repo_root="$1"
+  node -p "require('$repo_root/extensions/vscode/package.json').version"
+}
+
+fork_github_repo() {
+  local repo_root="$1"
+  if [ -n "${FORK_GITHUB_REPO:-}" ]; then
+    echo "$FORK_GITHUB_REPO"
+    return
+  fi
+
+  local url
+  url="$(git -C "$repo_root" remote get-url origin 2>/dev/null)" || fork_die "No git origin remote. Set FORK_GITHUB_REPO."
+
+  if [[ "$url" =~ github\.com[:/]([^/]+)/([^/.]+)(\.git)?$ ]]; then
+    echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  else
+    fork_die "Could not parse GitHub repo from origin: $url"
+  fi
+}
+
+fork_release_tag() {
+  echo "continue-v$1"
+}
+
+# Load repo-root .env (gitignored). Does not override variables already set in the shell.
+fork_load_env() {
+  local repo_root="${1:-$(fork_repo_root)}"
+  local env_file="$repo_root/.env"
+  local line key value
+
+  [ -f "$env_file" ] || return 0
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [ -n "$line" ] || continue
+    [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || continue
+
+    key="${BASH_REMATCH[1]}"
+    value="${BASH_REMATCH[2]}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+
+    if [[ "$value" =~ ^\"(.*)\"$ ]]; then
+      value="${BASH_REMATCH[1]}"
+    elif [[ "$value" =~ ^\'(.*)\'$ ]]; then
+      value="${BASH_REMATCH[1]}"
+    fi
+
+    if [ -z "${!key:-}" ]; then
+      export "$key=$value"
+    fi
+  done < "$env_file"
+}
+
+fork_github_token() {
+  fork_load_env
+
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    echo "$GITHUB_TOKEN"
+    return
+  fi
+
+  fork_die "GITHUB_TOKEN is required. Add it to .env in the repo root, or export it. Token needs 'repo' scope: https://github.com/settings/tokens"
+}
+
+fork_github_release_exists() {
+  local repo="$1"
+  local tag="$2"
+  local token http_code
+
+  token="$(fork_github_token)"
+  http_code="$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer $token" \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "https://api.github.com/repos/${repo}/releases/tags/${tag}")"
+
+  [ "$http_code" = "200" ]
+}
+
+# Create a GitHub release. Prints the numeric release id on success.
+fork_github_release_create() {
+  local repo="$1"
+  local tag="$2"
+  local title="$3"
+  local body="$4"
+  local token payload response
+
+  token="$(fork_github_token)"
+  payload="$(node - "$tag" "$title" "$body" <<'NODE'
+const [tag, title, body] = process.argv.slice(2);
+console.log(JSON.stringify({
+  tag_name: tag,
+  name: title,
+  body,
+  draft: false,
+  prerelease: false,
+}));
+NODE
+)"
+
+  response="$(curl -sf -X POST \
+    -H "Authorization: Bearer $token" \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    -H "Content-Type: application/json" \
+    -d "$payload" \
+    "https://api.github.com/repos/${repo}/releases")" || fork_die "Failed to create GitHub release $tag on $repo"
+
+  echo "$response" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).id"
+}
+
+fork_github_release_upload() {
+  local repo="$1"
+  local release_id="$2"
+  local file_path="$3"
+  local asset_name="$4"
+  local token
+
+  token="$(fork_github_token)"
+  [ -f "$file_path" ] || fork_die "Asset not found: $file_path"
+
+  curl -sf -X POST \
+    -H "Authorization: Bearer $token" \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    -H "Content-Type: application/octet-stream" \
+    --data-binary "@${file_path}" \
+    "https://uploads.github.com/repos/${repo}/releases/${release_id}/assets?name=${asset_name}" \
+    >/dev/null || fork_die "Failed to upload asset $asset_name"
+}
+
 # Bump extensions/vscode/package.json patch version (e.g. 1.3.44 -> 1.3.45).
 fork_bump_extension_version() {
   local repo_root="$1"

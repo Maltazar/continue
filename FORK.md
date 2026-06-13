@@ -148,12 +148,52 @@ Delegates to `install-vsix.ps1` (stages VSIX to `%TEMP%\continue-vsix-install` o
 
 VSCodium → Extensions → `...` → **Install from VSIX...**
 
+### From GitHub Releases
+
+Each published release includes `install-vsix.ps1` and `continue-<version>.vsix`.
+
+Download `install-vsix.ps1` from the [latest release](https://github.com/Maltazar/continue/releases/latest), then:
+
+```powershell
+.\install-vsix.ps1 -GitHubRepo Maltazar/continue
+.\install-vsix.ps1 -GitHubRepo Maltazar/continue -Version 1.3.45
+```
+
+`-Version latest` (default) installs the newest release. Tags use the form `continue-v1.3.45`.
+
+## Publish
+
+Build and upload a VSIX to GitHub Releases via the REST API (requires `curl` and a `GITHUB_TOKEN` with `repo` scope):
+
+Create a repo-root `.env` file (already gitignored):
+
+```bash
+GITHUB_TOKEN=ghp_...
+```
+
+Then publish:
+
+```bash
+SKIP_INSTALLS=true ./scripts/fork-publish.sh --skip-gui
+```
+
+| Flag         | Effect                                  |
+| ------------ | --------------------------------------- |
+| `--skip-gui` | Pass through to `fork-build.sh`         |
+| `--no-bump`  | Build without bumping patch version     |
+| `--no-build` | Upload the newest VSIX in `build/` only |
+
+Release tag: `continue-v<version>`. Assets: `continue-<version>.vsix` and `install-vsix.ps1`.
+
+Override repo with `FORK_GITHUB_REPO=owner/repo` if `origin` is not GitHub.
+
 ## Scripts
 
 | Script                     | Purpose                                         |
 | -------------------------- | ----------------------------------------------- |
 | `scripts/fork-setup.sh`    | One-time deps (core, gui, vscode extension)     |
 | `scripts/fork-build.sh`    | Bump version, build VSIX, create install bundle |
+| `scripts/fork-publish.sh`  | Build and upload VSIX to GitHub Releases        |
 | `scripts/install-vsix.ps1` | Native Windows installer (ships in bundle)      |
 | `scripts/fork-install.sh`  | WSL wrapper → `install-vsix.ps1`                |
 | `scripts/fork-common.sh`   | Shared helpers (not run directly)               |
@@ -166,6 +206,8 @@ VSCodium → Extensions → `...` → **Install from VSIX...**
 | `SKIP_INSTALLS=true`    | `fork-build.sh`    | Faster prepackage; Windows natives still fetched when cross-compiling |
 | `CONTINUE_WINDOWS_USER` | `fork-install.sh`  | Windows username for staging (auto-detected)                          |
 | `CONTINUE_VSCODIUM_CMD` | `install-vsix.ps1` | Path to `codium.cmd`                                                  |
+| `GITHUB_TOKEN`          | `fork-publish.sh`  | GitHub API token with `repo` scope (`.env` or environment)            |
+| `FORK_GITHUB_REPO`      | `fork-publish.sh`  | Target repo (`owner/repo`; default: git `origin`)                     |
 
 ## Troubleshooting
 
