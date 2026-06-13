@@ -2,19 +2,11 @@ import { getContinueRcPath, getTsConfigPath } from "core/util/paths";
 import * as vscode from "vscode";
 
 import { VsCodeExtension } from "../extension/VsCodeExtension";
-import { resetCommandRegistrationState } from "../commands";
 import { isUnsupportedPlatform } from "../util/util";
 
 import { GlobalContext } from "core/util/GlobalContext";
 import { VsCodeContinueApi } from "./api";
 import setupInlineTips from "./InlineTipManager";
-
-let activateWork: Promise<Record<string, unknown>> | undefined;
-
-export function resetActivationState() {
-  activateWork = undefined;
-  resetCommandRegistrationState();
-}
 
 export async function activateExtension(context: vscode.ExtensionContext) {
   // With extensionKind ["ui","workspace"], both hosts activate and register the same
@@ -24,15 +16,6 @@ export async function activateExtension(context: vscode.ExtensionContext) {
     return {};
   }
 
-  if (!activateWork) {
-    activateWork = activateOnce(context);
-  }
-  return activateWork;
-}
-
-async function activateOnce(
-  context: vscode.ExtensionContext,
-): Promise<Record<string, unknown>> {
   const platformCheck = isUnsupportedPlatform();
   const globalContext = new GlobalContext();
   const hasShownUnsupportedPlatformWarning = globalContext.get(
@@ -56,7 +39,6 @@ async function activateOnce(
   setupInlineTips(context);
 
   const vscodeExtension = new VsCodeExtension(context);
-  await vscodeExtension.registerExtensionCommands();
 
   // Load Continue configuration
   if (!context.globalState.get("hasBeenInstalled")) {

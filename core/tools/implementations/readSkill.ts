@@ -1,22 +1,26 @@
 import { ToolImpl } from ".";
-import { loadMarkdownSkills } from "../../config/markdown/loadMarkdownSkills";
+import {
+  loadMarkdownSkillContent,
+  loadMarkdownSkillMetadata,
+} from "../../config/markdown/loadMarkdownSkills";
 import { ContinueError, ContinueErrorReason } from "../../util/errors";
 import { getStringArg } from "../parseArgs";
 
 export const readSkillImpl: ToolImpl = async (args, extras) => {
   const skillName = getStringArg(args, "skillName");
 
-  const { skills } = await loadMarkdownSkills(extras.ide);
+  const { skills: skillMetadata } = await loadMarkdownSkillMetadata(extras.ide);
+  const metadata = skillMetadata.find((s) => s.name === skillName);
 
-  const skill = skills.find((s) => s.name === skillName);
-
-  if (!skill) {
-    const availableSkills = skills.map((s) => s.name).join(", ");
+  if (!metadata) {
+    const availableSkills = skillMetadata.map((s) => s.name).join(", ");
     throw new ContinueError(
       ContinueErrorReason.SkillNotFound,
       `Skill "${skillName}" not found. Available skills: ${availableSkills || "none"}`,
     );
   }
+
+  const skill = await loadMarkdownSkillContent(extras.ide, metadata);
 
   let content = skill.content;
 

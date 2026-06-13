@@ -21,8 +21,6 @@ import * as YAML from "yaml";
 
 import { convertJsonToYamlConfig } from "../../../packages/config-yaml/dist";
 
-import { safeRegisterCommand } from "./util/safeRegisterCommand";
-
 import {
   getAutocompleteStatusBarDescription,
   getAutocompleteStatusBarTitle,
@@ -872,11 +870,7 @@ async function installModelWithProgress(
   );
 }
 
-export function resetCommandRegistrationState() {
-  registerCommandsWork = undefined;
-}
-
-async function registerAllCommandsOnce(
+export function registerAllCommands(
   context: vscode.ExtensionContext,
   ide: VsCodeIde,
   extensionContext: vscode.ExtensionContext,
@@ -889,8 +883,6 @@ async function registerAllCommandsOnce(
   core: Core,
   editDecorationManager: EditDecorationManager,
 ) {
-  const existingCommands = new Set(await vscode.commands.getCommands(true));
-
   for (const [command, callback] of Object.entries(
     getCommandsMap(
       ide,
@@ -905,39 +897,8 @@ async function registerAllCommandsOnce(
       editDecorationManager,
     ),
   )) {
-    await safeRegisterCommand(context, command, callback, existingCommands);
-  }
-}
-
-let registerCommandsWork: Promise<void> | undefined;
-
-export async function registerAllCommands(
-  context: vscode.ExtensionContext,
-  ide: VsCodeIde,
-  extensionContext: vscode.ExtensionContext,
-  sidebar: ContinueGUIWebviewViewProvider,
-  consoleView: ContinueConsoleWebviewViewProvider,
-  configHandler: ConfigHandler,
-  verticalDiffManager: VerticalDiffManager,
-  battery: Battery,
-  quickEdit: QuickEdit,
-  core: Core,
-  editDecorationManager: EditDecorationManager,
-) {
-  if (!registerCommandsWork) {
-    registerCommandsWork = registerAllCommandsOnce(
-      context,
-      ide,
-      extensionContext,
-      sidebar,
-      consoleView,
-      configHandler,
-      verticalDiffManager,
-      battery,
-      quickEdit,
-      core,
-      editDecorationManager,
+    context.subscriptions.push(
+      vscode.commands.registerCommand(command, callback),
     );
   }
-  return registerCommandsWork;
 }

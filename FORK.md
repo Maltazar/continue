@@ -38,15 +38,22 @@ Use these to point at shared folders on a workstation without symlinks.
 
 Key files: `core/config/markdown/externalConfigPaths.ts`, `loadMarkdownRules.ts`, `loadMarkdownSkills.ts`, `loadLocalAssistants.ts`
 
-### VSCodium activation fix
+### Lazy skill loading
 
-Prevents duplicate command registration when running UI host + SSH remote.
+Reduces context usage: the agent sees skill **names and descriptions** in the `read_skill` tool schema, but SKILL.md **bodies are loaded only when the agent calls the tool** for one skill.
 
-- `extensions/vscode/package.json` — `extensionKind` set to `["ui"]` only
-- `extensions/vscode/src/activation/activate.ts` — skips workspace-host activation and duplicate `activate()` calls
-- `extensions/vscode/src/commands.ts` — skips commands already registered (survives partial reloads)
+- `loadMarkdownSkillMetadata()` — indexes name, description, path (reads frontmatter only; no auxiliary file walks)
+- `loadMarkdownSkillContent()` — loads one SKILL.md body + supporting files on demand
+- `read_skill` tool — metadata for the tool definition; full content on invocation
 
-After installing, **fully quit VSCodium** (all windows) before reopening. Reload Window alone can leave stale command handlers.
+Key files: `core/config/markdown/loadMarkdownSkills.ts`, `core/tools/definitions/readSkill.ts`, `core/tools/implementations/readSkill.ts`
+
+### VSCodium / SSH remote
+
+- `extensions/vscode/package.json` — `extensionKind` set to `["ui"]` only (avoids duplicate activation on Windows host + SSH remote)
+- `extensions/vscode/src/activation/activate.ts` — skips workspace-host activation
+
+The Running Extensions warning about `focusContinueInput` already registered is a known VSCodium cosmetic message when Continue works; safe to ignore.
 
 ## Prerequisites
 
@@ -164,11 +171,7 @@ Then reinstall with `install-vsix.ps1` (removes all `continue.continue-*` versio
 
 ### `Command 'continue.focusContinueInput' already registered`
 
-Harmless if Continue works. Usually caused by a reload leaving stale command handlers, or calling `registerCommand` when the command already exists. Reinstall with `install-vsix.ps1` (closes VSCodium, removes all `continue.continue-*` folders). If an old version still appears in DevTools Sources, fully quit VSCodium and reopen.
-
-### `Failed to load resource: sidebar-icon.png`
-
-Often a stale reference to an old extension version in DevTools. Confirm only one `continue.continue-*` folder exists under `%USERPROFILE%\.vscode-oss\extensions\`. Reinstall if needed.
+Cosmetic VSCodium message when Continue is working. Ignore it.
 
 ### YAML grammar overwrite warnings
 

@@ -1941,10 +1941,16 @@ export interface RuleWithSource extends RuleMetadata {
   rule: string;
 }
 
-export interface Skill {
+export interface SkillMetadata {
   name: string;
   description: string;
+  /** Display path (workspace-relative when possible) */
   path: string;
+  /** Absolute URI used to load SKILL.md on demand */
+  fileUri: string;
+}
+
+export interface Skill extends SkillMetadata {
   content: string;
   files: string[];
   license?: string;
