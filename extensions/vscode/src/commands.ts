@@ -325,10 +325,6 @@ const getCommandsMap: (
       editDecorationManager.clear();
       void sidebar.webviewProtocol?.request("exitEditMode", undefined);
     },
-    "continue.generateRule": async () => {
-      focusGUI();
-      void sidebar.webviewProtocol?.request("generateRule", undefined);
-    },
     "continue.writeCommentsForCode": async () => {
       streamInlineEdit(
         "comment",

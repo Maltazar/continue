@@ -20,11 +20,24 @@ Reopen VSCodium after install. Confirm **Continue.continue** at the new version 
 
 Do **not** run upstream `scripts/install-dependencies.sh` or build the `binary/` package. Neither is required for the VS Code extension; `binary/` fails on Node 22.
 
-## Fork changes
+## Upstream merge (Continue 2.x)
+
+Merged `continuedev/continue` `main` (post–`v2.1.0-vscode` docs) into this fork.
+
+**Verdict:** Upstream 2.0 / 2.1 did **not** fix agent tool usage on remotes. Tags `v2.0.0-vscode` / `v2.1.0-vscode` are mostly deprecation cleanup (Hub/login/Generate Rule removal, docs) plus a version bump. Upstream still fire-and-forgets remote terminal commands (`runCommand` with “output capture is not yet available for remote environments”) and still uses `extensionKind: ["ui","workspace"]`.
+
+**Kept from this fork** (still required):
+
+- SSH / remote `runCommandWithOutput` + shell-integration capture
+- Lazy `read_skill` loading
+- External `.cursor` / `.vscode` / `.claude` rules & skills paths
+- UI-only extension activation / idempotent command registration
+
+**Taken from upstream:** deprecation cleanup and docs site updates. Extension version aligned to **2.1.0**.
 
 ### SSH / remote terminal
 
-Fixes agent terminal commands over SSH, WSL, and dev containers ([#10542](https://github.com/continuedev/continue/issues/10542), [PR #10786](https://github.com/continuedev/continue/pull/10786)).
+Fixes agent terminal commands over SSH, WSL, and dev containers ([#10542](https://github.com/continuedev/continue/issues/10542), [PR #10786](https://github.com/continuedev/continue/pull/10786) — never merged upstream).
 
 - `extensions/vscode/src/VsCodeIde.ts` — `sendText(command, true)`; `runCommandWithOutput()` with shell integration; remote terminals via `workbench.action.terminal.new`
 - `core/tools/implementations/runTerminalCommand.ts` — remotes use `runCommandWithOutput` instead of fire-and-forget `runCommand`

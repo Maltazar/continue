@@ -135,8 +135,3 @@ export async function loadMarkdownSkillContent(
     license: frontmatter.license,
   };
 }
-
-/** @deprecated Use loadMarkdownSkillMetadata — kept for callers that expect the old name */
-export async function loadMarkdownSkills(ide: IDE) {
-  return loadMarkdownSkillMetadata(ide);
-}
